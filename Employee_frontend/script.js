@@ -1,0 +1,263 @@
+const apiBaseUrl = 'http://localhost:8081/employees';
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadEmployees();
+
+    const addEmployeeBtn = document.getElementById('addEmployeeBtn');
+    const employeeModal = document.getElementById('employeeModal');
+    const closeModal = document.getElementsByClassName('close')[0];
+    const employeeForm = document.getElementById('employeeForm');
+
+    addEmployeeBtn.addEventListener('click', () => {
+        employeeForm.reset();
+        openModal();
+    });
+
+    closeModal.addEventListener('click', () => {
+        closeModalFn();
+    });
+
+    window.onclick = function (event) {
+        if (event.target === employeeModal) {
+            closeModalFn();
+        }
+    }
+
+    employeeForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (validateForm()) {
+            const employeeIdHidden = document.getElementById('employeeIdHidden').value;
+            if (employeeIdHidden) {
+                updateEmployee(employeeIdHidden); // Ensure this is being called with the correct ID
+            } else {
+                createEmployee();
+            }
+        }
+    });
+    
+
+    async function loadEmployees() {
+        try {
+            const response = await fetch(`${apiBaseUrl}/getAll`);
+            if (!response.ok) throw new Error('Network response was not ok');
+            const employees = await response.json();
+            const employeeTableBody = document.getElementById('employeeTableBody');
+            employeeTableBody.innerHTML = '';
+            employees.forEach(employee => {
+                const row = document.createElement('tr');
+                row.id = `employee-${employee.id}`;
+                row.innerHTML = `
+                    <td>${employee.id}</td>
+                    <td>${employee.name}</td>
+                    <td>${employee.dateOfJoining}</td>
+                    <td>${employee.mobile}</td>
+                    <td>${employee.email}</td>
+                    <td>${employee.salary}</td>
+                    <td>${employee.designation}</td>
+                    <td>${employee.alternativeMobile || ''}</td>
+                    <td>
+                        <div class="actions">
+                            <button class="editBtn" onclick="editEmployee('${employee.id}')">Edit</button>
+                            <button class="deleteBtn" onclick="deleteEmployee('${employee.id}')">Delete</button>
+                        </div>
+                    </td>
+                `;
+                
+                 // Add event listeners for edit and delete buttons
+                 row.querySelector('.editBtn').addEventListener('click', () => editEmployee(employee.id));
+                 row.querySelector('.deleteBtn').addEventListener('click', () => deleteEmployee(employee.id));
+                 employeeTableBody.appendChild(row);
+             });
+         } catch (error) {
+             console.error('Error loading employees:', error);
+             alert('Failed to load employees. Please try again later.');
+         }
+     }
+ 
+
+     async function createEmployee() {
+        const employee = getEmployeeFormData();
+        try {
+            const response = await fetch(`${apiBaseUrl}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(employee)
+            });
+            if (!response.ok) throw new Error('Network response was not ok');
+            const newEmployee = await response.json();
+            closeModalFn();
+            loadEmployees();
+            showSuccessMessage('Employee registered successfully!');
+        } catch (error) {
+            console.error('Error creating employee:', error);
+            alert('Failed to create employee. Please try again later.');
+        }
+    }
+    
+
+    async function updateEmployee(id) {
+        try {
+            const employee = getEmployeeFormData(); // Use getEmployeeFormData instead of getFormData
+            const response = await fetch(`${apiBaseUrl}/update/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(employee)
+            });
+    
+            if (response.status === 200) {
+                closeModalFn();
+                loadEmployees();
+                showSuccessMessage('Employee successfully updated!');
+            } else if (response.status === 409) {
+                alert('Duplicate entry detected');
+            } else {
+                alert('Failed to update employee');
+            }
+        } catch (error) {
+            console.error('Error updating employee:', error);
+            alert('Failed to update employee. Please try again later.');
+        }
+    }
+    
+    
+
+
+    async function deleteEmployee(id) {
+        if (!confirm('Are you sure you want to delete this employee?')) return;
+    
+        try {
+            const response = await fetch(`${apiBaseUrl}/delete/${id}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) {
+                const row = document.querySelector(`#employee-${id}`);
+                if (row) {
+                    row.remove(); // Remove the row from the front-end
+                }
+                showSuccessMessage('Employee successfully deleted!');
+            } else {
+                alert('Failed to delete employee');
+            }
+        } catch (error) {
+            console.error('Error deleting employee:', error);
+            alert('Failed to delete employee. Please try again later.');
+        }
+    }
+    async function editEmployee(id) {
+        try {
+            const response = await fetch(`${apiBaseUrl}/${id}`);
+            if (!response.ok) throw new Error('Failed to fetch employee data');
+            const employee = await response.json();
+            openModal(employee);
+        } catch (error) {
+            console.error('Error fetching employee data:', error);
+            alert('Failed to fetch employee data. Please try again later.');
+        }
+    }
+    
+    
+
+    function openModal(employee) {
+        document.getElementById('modalTitle').textContent = 'Add Employee';
+        document.getElementById('employeeIdHidden').value = '';
+        if (employee) {
+            document.getElementById('modalTitle').textContent = 'Edit Employee';
+            document.getElementById('employeeIdHidden').value = employee.id;
+            document.getElementById('id').value = employee.id;
+            document.getElementById('name').value = employee.name;
+            document.getElementById('dateOfJoining').value = employee.dateOfJoining;
+            document.getElementById('mobile').value = employee.mobile;
+            document.getElementById('email').value = employee.email;
+            document.getElementById('salary').value = employee.salary;
+            document.getElementById('designation').value = employee.designation;
+            document.getElementById('alternativeMobile').value = employee.alternativeMobile;
+        } else {
+            employeeForm.reset();
+        }
+        employeeModal.style.display = 'block';
+    }
+
+    function closeModalFn() {
+        employeeModal.style.display = 'none';
+    }
+
+    function getEmployeeFormData() {
+        return {
+            id: document.getElementById('id').value,
+            name: document.getElementById('name').value,
+            dateOfJoining: document.getElementById('dateOfJoining').value,
+            mobile: document.getElementById('mobile').value,
+            email: document.getElementById('email').value,
+            salary: document.getElementById('salary').value,
+            designation: document.getElementById('designation').value,
+            alternativeMobile: document.getElementById('alternativeMobile').value
+        };
+    }
+
+    function validateForm() {
+        const id = document.getElementById('id').value;
+        const name = document.getElementById('name').value;
+        const dateOfJoining = document.getElementById('dateOfJoining').value;
+        const mobile = document.getElementById('mobile').value;
+        const email = document.getElementById('email').value;
+        const salary = document.getElementById('salary').value;
+        const designation = document.getElementById('designation').value;
+        const alternativeMobile = document.getElementById('alternativeMobile').value;
+
+        // Employee ID Validation
+        if (!/^[a-zA-Z0-9]+$/.test(id)) {
+            alert('Employee ID must be alphanumeric');
+            return false;
+        }
+
+        // Employee Name Validation
+        if (!/^[a-zA-Z\s]+$/.test(name)) {
+            alert('Employee Name must contain only letters and spaces');
+            return false;
+        }
+
+        // Date of Joining Validation
+        if (!dateOfJoining) {
+            alert('Please enter Date of Joining');
+            return false;
+        }
+
+        // Mobile Number Validation
+        if (!/^\d{10}$/.test(mobile)) {
+            alert('Mobile number must be 10 digits');
+            return false;
+        }
+
+        // Email Validation
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            alert('Please enter a valid email address');
+            return false;
+        }
+
+        // Salary Validation
+        if (!/^\d+(\.\d{1,2})?$/.test(salary)) {
+            alert('Please enter a valid salary');
+            return false;
+        }
+
+        // Designation Validation
+        if (!designation) {
+            alert('Please enter a designation');
+            return false;
+        }
+
+        // Alternative Mobile Number Validation (if provided)
+        if (alternativeMobile && !/^\d{10}$/.test(alternativeMobile)) {
+            alert('Alternative mobile number must be 10 digits');
+            return false;
+        }
+
+        return true;
+    }
+
+    function showSuccessMessage(message) {
+        alert(message); // You can replace this with a more user-friendly notification
+    }
+});
