@@ -29,7 +29,7 @@ public class UserController {
         String errorMessage = "";
         String successMessage = "";
 
-        if (!user.getPassword().equals(user.getCpassword())) {
+        if (!user.getPassword().equals(user.getConfirmPassword())) {
             status = HttpStatus.CONFLICT;
             errorMessage = "Passwords do not match";
         } else if (service.isUsernameTaken(user.getUsername())) {
